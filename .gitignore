@@ -24,3 +24,7 @@ Release/
 *.aps
 *.ncb
 ipch/
+
+# Credentials
+toolsgitgit-credentials
+*credentials*

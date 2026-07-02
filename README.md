@@ -1,4 +1,4 @@
-﻿# learnOpenGL 学习教程
+# learnOpenGL 学习教程
 
 这个项目是从零开始学习 OpenGL 的完整实践记录，基于 [learnopengl.com](https://learnopengl.com)（[中文站](https://learnopengl-cn.github.io)）系列教程。项目使用 **Visual Studio 2022** (v143) + **C++17** 构建，采用 **Core Profile** 模式。
 
@@ -47,6 +47,70 @@ learnOpenGL/
 | **stb_image**| 纹理图像加载          | 单头文件库，`src/stb_image.h`            |
 
 项目已配置好 `AdditionalIncludeDirectories` 和 `AdditionalLibraryDirectories`，Visual Studio 中直接按 **F5** 即可编译运行。Post-build 事件会自动把 `shaders/` 和 `resources/` 复制到输出目录。
+
+---
+
+## 代码结构规范
+
+所有 OpenGL 程序都遵循同一个结构分界线：**创建放 main、绑定和绘制放循环**。
+
+### main 函数（只执行一次）
+
+```
+1. 初始化窗口和 OpenGL
+   glfwInit -> glfwCreateWindow -> gladLoadGL -> ...
+
+2. 创建着色器程序
+   Shader("vertex.glsl", "fragment.glsl")
+
+3. 上传顶点数据到 GPU
+   vertices / indices -> VAO / VBO / EBO
+   glVertexAttribPointer / glEnableVertexAttribArray
+
+4. 准备纹理等固定资源
+   glGenTextures -> glTexParameteri
+   stbi_load -> glTexImage2D -> glGenerateMipmap
+```
+
+### 渲染循环（每帧执行一次）
+
+```
+while (!glfwWindowShouldClose(window)) {
+    1. 输入处理
+       processInput(window)
+
+    2. 清屏
+       glClear(GL_COLOR_BUFFER_BIT)
+
+    3. 绑定每帧不变的资源
+       glActiveTexture -> glBindTexture
+
+    4. 设置着色器 + 每帧变化的 uniform
+       ourShader.use()
+       setInt / setMat4 / glUniform*
+
+    5. 绘制
+       glBindVertexArray -> glDrawElements / glDrawArrays
+
+    6. 交换缓冲区 + 轮询事件
+       glfwSwapBuffers / glfwPollEvents
+}```
+
+### 分界原则
+
+| 放在 main 中（循环外） | 放在渲染循环内 |
+|---|---|
+| 创建窗口、初始化 GLAD | 绑定纹理、绑定 VAO |
+| 创建 VAO/VBO/EBO，上传顶点数据 | use() + 设置 uniform |
+| 加载纹理图片到 GPU | glClear 清屏 |
+| 创建 shader 程序对象 | glDraw* 绘制命令 |
+| 只设置一次的值（如纹理单元映射） | 每帧变化的值（旋转角度、摄像机位置） |
+
+### 为什么这样分
+
+- glUniform* 必须在 glUseProgram(program) 之后调用才能生效。如果 uniform 放在循环外，下次循环里 use() 重新激活程序后，uniform 值虽然保留在程序对象中，但代码逻辑上割裂了——读代码的人要跳着看才能拼出完整渲染状态。
+
+- 把 use() + uniform + bind + draw 写在一起，形成每帧一个完整的渲染块，既正确、又清晰。
 
 ---
 
